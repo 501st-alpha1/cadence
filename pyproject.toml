@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cadence"
+version = "0.1.0"
+description = "A plain-text, git-native job search tracker"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.1",          # CLI framework
+    "rich>=13.0",          # terminal output formatting
+    "python-dateutil>=2.9", # flexible date parsing
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",
+]
+
+[project.scripts]
+cadence = "cadence.cli:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cadence"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
