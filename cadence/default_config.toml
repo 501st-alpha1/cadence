@@ -1,0 +1,19 @@
+[repos]
+public = "~/jobs/cadence-data"
+private = "~/jobs/cadence-private"
+
+[thresholds]
+# Days before an unanswered outbound message triggers a follow-up suggestion
+message_followup_days = 5
+# Days before an application with no status change triggers a follow-up suggestion
+application_followup_days = 14
+# Days before a non-progressing application is suggested as ghosted
+ghosted_days = 30
+# Hours after a completed interview before thank-you reminder appears
+interview_thankyou_hours = 48
+# Days before a scheduled interview to surface a prep reminder
+interview_prep_days = 2
+
+[resume]
+# A label identifying your current default resume version
+default_version = "v1"
