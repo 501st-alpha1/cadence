@@ -6,11 +6,12 @@ build-backend = "hatchling.build"
 name = "cadence"
 version = "0.1.0"
 description = "A plain-text, git-native job search tracker"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "click>=8.1",          # CLI framework
     "rich>=13.0",          # terminal output formatting
     "python-dateutil>=2.9", # flexible date parsing
+    "tomli>=2.0; python_version < '3.11'",  # tomllib backport for 3.10
 ]
 
 [project.optional-dependencies]

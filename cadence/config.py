@@ -10,7 +10,10 @@ Looks for config in (in order of precedence):
 from __future__ import annotations
 
 import os
-import tomllib
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]  # backport for Python 3.10
 from pathlib import Path
 from typing import Any
 
