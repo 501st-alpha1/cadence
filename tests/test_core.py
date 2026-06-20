@@ -184,6 +184,40 @@ class TestStorage(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.current_terms.compensation, "120k")
 
+    def test_find_application_by_prefix(self):
+        a = Application(company_id="co-1", role_title="Engineer")
+        a.transition("started")
+        self.store.save_application(a)
+
+        results = self.store.find_application(a.id[:6])
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].id, a.id)
+
+    def test_find_application_no_match(self):
+        results = self.store.find_application("zzzzzzzz")
+        self.assertEqual(results, [])
+
+    def test_find_job_description_by_prefix(self):
+        jd = JobDescription(company_id="co-1", title="Backend Engineer")
+        self.store.save_job_description(jd)
+        results = self.store.find_job_description(jd.id[:6])
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].title, "Backend Engineer")
+
+    def test_find_offer_by_prefix(self):
+        a = Application(company_id="co-1")
+        self.store.save_application(a)
+        o = Offer(application_id=a.id, versions=[OfferVersion(compensation="100k")])
+        self.store.save_offer(o)
+        results = self.store.find_offer(o.id[:6])
+        self.assertEqual(len(results), 1)
+
+    def test_find_reference_contact_by_prefix(self):
+        rc = ReferenceContact(person_id="p-1", relationship="former manager")
+        self.store.save_reference_contact(rc)
+        results = self.store.find_reference_contact(rc.id[:6])
+        self.assertEqual(len(results), 1)
+
     def test_all_companies_empty(self):
         results = list(self.store.all_companies())
         self.assertEqual(results, [])

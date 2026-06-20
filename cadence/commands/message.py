@@ -4,6 +4,7 @@ import click
 from rich.console import Console
 
 from cadence.config import load_config
+from cadence.commands.application import resolve_application
 from cadence.models import Message
 from cadence.storage import Store
 from cadence.utils.cli import resolve_or_pick, short_id
@@ -18,7 +19,7 @@ def msg() -> None:
 
 
 @msg.command("add")
-@click.option("--app", "app_id", default=None, help="Application ID")
+@click.option("--app", "app_query", default=None, help="Application ID prefix")
 @click.option("--person", "person_query", default=None, help="Person name or ID")
 @click.option("--direction", type=click.Choice(["inbound", "outbound"]),
               prompt=True)
@@ -28,9 +29,16 @@ def msg() -> None:
 @click.option("--body", prompt="Body (or summary)")
 @click.option("--request-doc", multiple=True,
               help="Document type requested (e.g. resume). Repeatable.")
-def msg_add(app_id, person_query, direction, channel, subject, body, request_doc) -> None:
+def msg_add(app_query, person_query, direction, channel, subject, body, request_doc) -> None:
     """Log a message."""
     store = Store(load_config())
+
+    app_id = None
+    if app_query:
+        application = resolve_application(store, app_query)
+        if not application:
+            return
+        app_id = application.id
 
     person_id = None
     if person_query:
@@ -62,10 +70,10 @@ def msg_add(app_id, person_query, direction, channel, subject, body, request_doc
 
 
 @msg.command("list")
-@click.option("--app", "app_id", default=None)
+@click.option("--app", "app_query", default=None, help="Application ID prefix")
 @click.option("--person", "person_query", default=None)
 @click.option("--unanswered", is_flag=True, default=False)
-def msg_list(app_id, person_query, unanswered) -> None:
+def msg_list(app_query, person_query, unanswered) -> None:
     """List messages."""
     store = Store(load_config())
 
@@ -73,8 +81,9 @@ def msg_list(app_id, person_query, unanswered) -> None:
         p = resolve_or_pick(person_query, store.find_person,
                             lambda x: x.name, "person")
         messages = store.messages_for_person(p.id) if p else []
-    elif app_id:
-        messages = store.messages_for_application(app_id)
+    elif app_query:
+        application = resolve_application(store, app_query)
+        messages = store.messages_for_application(application.id) if application else []
     else:
         messages = list(store.all_messages())
 

@@ -17,6 +17,24 @@ console = Console()
 VALID_STATUSES = [s.value for s in ApplicationStatus]
 
 
+def _application_label(store: Store, a: Application) -> str:
+    companies = {c.id: c for c in store.all_companies()}
+    jds = {j.id: j for j in store.all_job_descriptions()}
+    company = companies.get(a.company_id)
+    jd = jds.get(a.job_description_id or "")
+    role = a.role_title or (jd.title if jd else "—")
+    co = company.display_name if company else "?"
+    return f"{co} — {role}  [{a.status}]  [{short_id(a.id)}]"
+
+
+def resolve_application(store: Store, query: str) -> Application | None:
+    """Resolve an application by ID prefix, prompting if ambiguous."""
+    return resolve_or_pick(
+        query, store.find_application,
+        lambda a: _application_label(store, a), "application"
+    )
+
+
 @click.group()
 def app() -> None:
     """Manage job applications."""
@@ -26,28 +44,32 @@ def app() -> None:
 @app.command("add")
 @click.option("--company", "company_query", default=None,
               help="Company name prefix or ID")
-@click.option("--jd", "jd_id", default=None, help="Job description ID")
+@click.option("--jd", "jd_query", default=None, help="Job description ID prefix")
 @click.option("--role", default=None, help="Role title (if no JD)")
 @click.option("--source", default=None,
               help="e.g. linkedin, referral, hacker_news")
 @click.option("--resume", default=None, help="Resume version label")
 @click.option("--status", default="started",
               type=click.Choice(VALID_STATUSES), show_default=True)
-def app_add(company_query, jd_id, role, source, resume, status) -> None:
+def app_add(company_query, jd_query, role, source, resume, status) -> None:
     """Add a new application."""
     config = load_config()
     store = Store(config)
 
     # Resolve company
-    if not company_query and not jd_id:
+    if not company_query and not jd_query:
         company_query = click.prompt("Company name or ID")
 
+    jd_id = None
     company_id = None
-    if jd_id:
-        jd = store.get_job_description(jd_id)
+    if jd_query:
+        jd = resolve_or_pick(
+            jd_query, store.find_job_description,
+            lambda j: f"{j.title}  [{short_id(j.id)}]", "job description"
+        )
         if not jd:
-            console.print(f"[red]Job description {jd_id} not found[/red]")
             return
+        jd_id = jd.id
         company_id = jd.company_id
         role = role or jd.title
     else:
@@ -80,25 +102,13 @@ def app_add(company_query, jd_id, role, source, resume, status) -> None:
 
 
 @app.command("show")
-@click.argument("app_id")
-def app_show(app_id: str) -> None:
-    """Show an application."""
+@click.argument("app_query")
+def app_show(app_query: str) -> None:
+    """Show an application. Accepts ID or unique ID prefix."""
     store = Store(load_config())
-    application = store.get_application(app_id)
+    application = resolve_application(store, app_query)
     if not application:
-        # Try prefix match
-        matches = [
-            a for a in store.all_applications()
-            if a.id.startswith(app_id)
-        ]
-        if len(matches) == 1:
-            application = matches[0]
-        elif len(matches) > 1:
-            console.print("[yellow]Multiple matches — be more specific[/yellow]")
-            return
-        else:
-            console.print(f"[red]Application {app_id} not found[/red]")
-            return
+        return
 
     companies = {c.id: c for c in store.all_companies()}
     jds = {j.id: j for j in store.all_job_descriptions()}
@@ -184,15 +194,14 @@ def app_list(status, company_query, active) -> None:
 
 
 @app.command("status")
-@click.argument("app_id")
+@click.argument("app_query")
 @click.argument("new_status", type=click.Choice(VALID_STATUSES))
 @click.option("--notes", default="", help="Reason or context for this change")
-def app_status(app_id: str, new_status: str, notes: str) -> None:
+def app_status(app_query: str, new_status: str, notes: str) -> None:
     """Update the status of an application."""
     store = Store(load_config())
-    application = store.get_application(app_id)
+    application = resolve_application(store, app_query)
     if not application:
-        console.print(f"[red]Application {app_id} not found[/red]")
         return
     application.transition(new_status, notes=notes)
     if new_status == "applied" and not application.applied_at:
@@ -202,14 +211,13 @@ def app_status(app_id: str, new_status: str, notes: str) -> None:
 
 
 @app.command("submit")
-@click.argument("app_id")
+@click.argument("app_query")
 @click.option("--notes", default="")
-def app_submit(app_id: str, notes: str) -> None:
+def app_submit(app_query: str, notes: str) -> None:
     """Mark an application as submitted (started → applied)."""
     store = Store(load_config())
-    application = store.get_application(app_id)
+    application = resolve_application(store, app_query)
     if not application:
-        console.print(f"[red]Application {app_id} not found[/red]")
         return
     application.transition("applied", notes=notes)
     application.applied_at = application.status_history[-1].at
@@ -218,14 +226,13 @@ def app_submit(app_id: str, notes: str) -> None:
 
 
 @app.command("cancel")
-@click.argument("app_id")
+@click.argument("app_query")
 @click.option("--notes", default="", help="Why you're abandoning this application")
-def app_cancel(app_id: str, notes: str) -> None:
+def app_cancel(app_query: str, notes: str) -> None:
     """Abandon an application before submitting it (started → canceled)."""
     store = Store(load_config())
-    application = store.get_application(app_id)
+    application = resolve_application(store, app_query)
     if not application:
-        console.print(f"[red]Application {app_id} not found[/red]")
         return
     application.transition("canceled", notes=notes)
     store.save_application(application)
@@ -233,13 +240,12 @@ def app_cancel(app_id: str, notes: str) -> None:
 
 
 @app.command("note")
-@click.argument("app_id")
-def app_note(app_id: str) -> None:
+@click.argument("app_query")
+def app_note(app_query: str) -> None:
     """Edit notes on an application in $EDITOR."""
     store = Store(load_config())
-    application = store.get_application(app_id)
+    application = resolve_application(store, app_query)
     if not application:
-        console.print(f"[red]Application {app_id} not found[/red]")
         return
     application.notes = open_in_editor(application.notes)
     store.save_application(application)
@@ -247,14 +253,13 @@ def app_note(app_id: str) -> None:
 
 
 @app.command("cover")
-@click.argument("app_id")
+@click.argument("app_query")
 @click.option("--version", default=None, help="Version label for this cover letter")
-def app_cover(app_id: str, version: str) -> None:
+def app_cover(app_query: str, version: str) -> None:
     """Compose or edit the cover letter for an application in $EDITOR."""
     store = Store(load_config())
-    application = store.get_application(app_id)
+    application = resolve_application(store, app_query)
     if not application:
-        console.print(f"[red]Application {app_id} not found[/red]")
         return
     application.cover_letter = open_in_editor(application.cover_letter)
     if version:

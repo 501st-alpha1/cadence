@@ -22,6 +22,8 @@ def resolve_or_pick(query: str, find_fn: Callable[[str], list[T]],
     - If exactly one match: return it.
     - If multiple matches: present a numbered list and ask the user to pick.
     - If no matches: print error and return None.
+    label_fn should produce a short, identifying description for the picker,
+    e.g. "Acme Corp — Backend Engineer [a1b2c3d4]".
     """
     results = find_fn(query)
     if not results:

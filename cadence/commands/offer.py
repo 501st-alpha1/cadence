@@ -4,6 +4,7 @@ import click
 from rich.console import Console
 
 from cadence.config import load_config
+from cadence.commands.application import resolve_application
 from cadence.models import Offer
 from cadence.models.offer import OfferVersion, OfferStatus
 from cadence.models.application import TERMINAL_STATUSES
@@ -21,26 +22,25 @@ def offer() -> None:
 
 
 @offer.command("add")
-@click.argument("app_id")
+@click.argument("app_query")
 @click.option("--compensation", prompt="Compensation (freeform)")
 @click.option("--expires", default=None, help="Expiry date YYYY-MM-DD")
 @click.option("--notes", default="")
-def offer_add(app_id: str, compensation: str, expires: str, notes: str) -> None:
+def offer_add(app_query: str, compensation: str, expires: str, notes: str) -> None:
     """Record an offer for an application."""
     store = Store(load_config())
-    application = store.get_application(app_id)
+    application = resolve_application(store, app_query)
     if not application:
-        console.print(f"[red]Application {app_id} not found[/red]")
         return
 
-    existing = store.offer_for_application(app_id)
+    existing = store.offer_for_application(application.id)
     if existing:
         console.print("[yellow]An offer already exists for this application. "
                       "Use 'cadence offer revise' to add a new version.[/yellow]")
         return
 
     o = Offer(
-        application_id=app_id,
+        application_id=application.id,
         versions=[OfferVersion(compensation=compensation, notes=notes)],
         expires_at=expires,
         notes=notes,
@@ -52,15 +52,18 @@ def offer_add(app_id: str, compensation: str, expires: str, notes: str) -> None:
 
 
 @offer.command("revise")
-@click.argument("app_id")
+@click.argument("app_query")
 @click.option("--compensation", prompt="New compensation terms")
 @click.option("--notes", default="")
-def offer_revise(app_id: str, compensation: str, notes: str) -> None:
+def offer_revise(app_query: str, compensation: str, notes: str) -> None:
     """Add a revised offer version (after negotiation)."""
     store = Store(load_config())
-    o = store.offer_for_application(app_id)
+    application = resolve_application(store, app_query)
+    if not application:
+        return
+    o = store.offer_for_application(application.id)
     if not o:
-        console.print(f"[red]No offer found for application {app_id}[/red]")
+        console.print(f"[red]No offer found for this application[/red]")
         return
     o.versions.append(OfferVersion(compensation=compensation, notes=notes))
     store.save_offer(o)
@@ -68,13 +71,16 @@ def offer_revise(app_id: str, compensation: str, notes: str) -> None:
 
 
 @offer.command("show")
-@click.argument("app_id")
-def offer_show(app_id: str) -> None:
+@click.argument("app_query")
+def offer_show(app_query: str) -> None:
     """Show offer details for an application."""
     store = Store(load_config())
-    o = store.offer_for_application(app_id)
+    application = resolve_application(store, app_query)
+    if not application:
+        return
+    o = store.offer_for_application(application.id)
     if not o:
-        console.print(f"[red]No offer found for application {app_id}[/red]")
+        console.print(f"[red]No offer found for this application[/red]")
         return
     print_kv([
         ("ID", o.id),
@@ -91,27 +97,28 @@ def offer_show(app_id: str) -> None:
 
 
 @offer.command("accept")
-@click.argument("app_id")
-def offer_accept(app_id: str) -> None:
+@click.argument("app_query")
+def offer_accept(app_query: str) -> None:
     """Accept an offer and optionally withdraw other active applications."""
     store = Store(load_config())
-    o = store.offer_for_application(app_id)
+    application = resolve_application(store, app_query)
+    if not application:
+        return
+    o = store.offer_for_application(application.id)
     if not o:
-        console.print(f"[red]No offer found for application {app_id}[/red]")
+        console.print(f"[red]No offer found for this application[/red]")
         return
 
     o.status = OfferStatus.ACCEPTED
     store.save_offer(o)
 
-    application = store.get_application(app_id)
-    if application:
-        application.transition("accepted")
-        store.save_application(application)
+    application.transition("accepted")
+    store.save_application(application)
 
     # Offer to withdraw other active applications
     others = [
         a for a in store.all_applications()
-        if a.id != app_id and a.status not in TERMINAL_STATUSES
+        if a.id != application.id and a.status not in TERMINAL_STATUSES
     ]
     if others:
         console.print(
@@ -127,23 +134,24 @@ def offer_accept(app_id: str) -> None:
 
 
 @offer.command("decline")
-@click.argument("app_id")
+@click.argument("app_query")
 @click.option("--notes", default="")
-def offer_decline(app_id: str, notes: str) -> None:
+def offer_decline(app_query: str, notes: str) -> None:
     """Decline an offer."""
     store = Store(load_config())
-    o = store.offer_for_application(app_id)
+    application = resolve_application(store, app_query)
+    if not application:
+        return
+    o = store.offer_for_application(application.id)
     if not o:
-        console.print(f"[red]No offer found for application {app_id}[/red]")
+        console.print(f"[red]No offer found for this application[/red]")
         return
     o.status = OfferStatus.DECLINED
     if notes:
         o.notes = (o.notes + "\n" + notes).strip()
     store.save_offer(o)
 
-    application = store.get_application(app_id)
-    if application:
-        application.transition("declined_offer", notes=notes)
-        store.save_application(application)
+    application.transition("declined_offer", notes=notes)
+    store.save_application(application)
 
     console.print("[green]Offer declined.[/green]")

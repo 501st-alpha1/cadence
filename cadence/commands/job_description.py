@@ -50,13 +50,15 @@ def jd_add(company_query, title, url, source, closes) -> None:
 
 
 @jd.command("show")
-@click.argument("jd_id")
-def jd_show(jd_id: str) -> None:
-    """Show a job description."""
+@click.argument("jd_query")
+def jd_show(jd_query: str) -> None:
+    """Show a job description. Accepts ID or unique ID prefix."""
     store = Store(load_config())
-    j = store.get_job_description(jd_id)
+    j = resolve_or_pick(
+        jd_query, store.find_job_description,
+        lambda x: f"{x.title}  [{short_id(x.id)}]", "job description"
+    )
     if not j:
-        console.print(f"[red]Job description {jd_id} not found[/red]")
         return
     companies = {c.id: c for c in store.all_companies()}
     company = companies.get(j.company_id)

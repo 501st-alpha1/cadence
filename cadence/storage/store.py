@@ -77,6 +77,11 @@ class Store:
             return True
         return False
 
+    def _find_by_id_prefix(self, items: Iterator[T], query: str) -> list[T]:
+        """Match items whose id starts with query (case-insensitive)."""
+        q = query.lower()
+        return [item for item in items if item.id.lower().startswith(q)]  # type: ignore[attr-defined]
+
     # ------------------------------------------------------------------ #
     # Public repo — Companies
     # ------------------------------------------------------------------ #
@@ -91,12 +96,12 @@ class Store:
         return self._all(self._public, "companies", Company.from_dict)
 
     def find_company(self, query: str) -> list[Company]:
-        """Find companies by name prefix or ID prefix."""
+        """Find companies by ID prefix or name prefix."""
+        by_id = self._find_by_id_prefix(self.all_companies(), query)
+        if by_id:
+            return by_id
         q = query.lower()
-        return [
-            c for c in self.all_companies()
-            if c.id.startswith(q) or c.display_name.lower().startswith(q)
-        ]
+        return [c for c in self.all_companies() if c.display_name.lower().startswith(q)]
 
     # ------------------------------------------------------------------ #
     # Public repo — Job Descriptions
@@ -110,6 +115,10 @@ class Store:
 
     def all_job_descriptions(self) -> Iterator[JobDescription]:
         return self._all(self._public, "job_descriptions", JobDescription.from_dict)
+
+    def find_job_description(self, query: str) -> list[JobDescription]:
+        """Find job descriptions by ID prefix."""
+        return self._find_by_id_prefix(self.all_job_descriptions(), query)
 
     # ------------------------------------------------------------------ #
     # Private repo — People
@@ -125,12 +134,12 @@ class Store:
         return self._all(self._private, "people", Person.from_dict)
 
     def find_person(self, query: str) -> list[Person]:
-        """Find people by name prefix or ID prefix."""
+        """Find people by ID prefix or name prefix."""
+        by_id = self._find_by_id_prefix(self.all_people(), query)
+        if by_id:
+            return by_id
         q = query.lower()
-        return [
-            p for p in self.all_people()
-            if p.id.startswith(q) or p.name.lower().startswith(q)
-        ]
+        return [p for p in self.all_people() if p.name.lower().startswith(q)]
 
     # ------------------------------------------------------------------ #
     # Private repo — Applications
@@ -145,6 +154,10 @@ class Store:
     def all_applications(self) -> Iterator[Application]:
         return self._all(self._private, "applications", Application.from_dict)
 
+    def find_application(self, query: str) -> list[Application]:
+        """Find applications by ID prefix."""
+        return self._find_by_id_prefix(self.all_applications(), query)
+
     # ------------------------------------------------------------------ #
     # Private repo — Messages
     # ------------------------------------------------------------------ #
@@ -157,6 +170,10 @@ class Store:
 
     def all_messages(self) -> Iterator[Message]:
         return self._all(self._private, "messages", Message.from_dict)
+
+    def find_message(self, query: str) -> list[Message]:
+        """Find messages by ID prefix."""
+        return self._find_by_id_prefix(self.all_messages(), query)
 
     def messages_for_application(self, application_id: str) -> list[Message]:
         return [m for m in self.all_messages() if m.application_id == application_id]
@@ -177,6 +194,10 @@ class Store:
     def all_offers(self) -> Iterator[Offer]:
         return self._all(self._private, "offers", Offer.from_dict)
 
+    def find_offer(self, query: str) -> list[Offer]:
+        """Find offers by ID prefix."""
+        return self._find_by_id_prefix(self.all_offers(), query)
+
     def offer_for_application(self, application_id: str) -> Optional[Offer]:
         for offer in self.all_offers():
             if offer.application_id == application_id:
@@ -196,6 +217,10 @@ class Store:
     def all_take_homes(self) -> Iterator[TakeHome]:
         return self._all(self._private, "take_homes", TakeHome.from_dict)
 
+    def find_take_home(self, query: str) -> list[TakeHome]:
+        """Find take-homes by ID prefix."""
+        return self._find_by_id_prefix(self.all_take_homes(), query)
+
     def take_home_for_application(self, application_id: str) -> Optional[TakeHome]:
         for th in self.all_take_homes():
             if th.application_id == application_id:
@@ -214,3 +239,7 @@ class Store:
 
     def all_reference_contacts(self) -> Iterator[ReferenceContact]:
         return self._all(self._private, "references", ReferenceContact.from_dict)
+
+    def find_reference_contact(self, query: str) -> list[ReferenceContact]:
+        """Find reference contacts by ID prefix."""
+        return self._find_by_id_prefix(self.all_reference_contacts(), query)

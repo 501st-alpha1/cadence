@@ -4,6 +4,7 @@ import click
 from rich.console import Console
 
 from cadence.config import load_config
+from cadence.commands.application import resolve_application
 from cadence.models import ReferenceContact
 from cadence.models.application import ApplicationReference
 from cadence.models.base import now_utc
@@ -79,20 +80,24 @@ def ref_list() -> None:
 
 
 @ref.command("use")
-@click.argument("app_id")
-@click.argument("ref_id")
+@click.argument("app_query")
+@click.argument("ref_query")
 @click.option("--notes", default="")
-def ref_use(app_id: str, ref_id: str, notes: str) -> None:
+def ref_use(app_query: str, ref_query: str, notes: str) -> None:
     """Record that a reference was listed on an application."""
     store = Store(load_config())
-    application = store.get_application(app_id)
+    application = resolve_application(store, app_query)
     if not application:
-        console.print(f"[red]Application {app_id} not found[/red]")
         return
 
-    rc = store.get_reference_contact(ref_id)
+    people = {p.id: p for p in store.all_people()}
+
+    def ref_label(r):
+        p = people.get(r.person_id)
+        return f"{p.name if p else r.person_id}  [{short_id(r.id)}]"
+
+    rc = resolve_or_pick(ref_query, store.find_reference_contact, ref_label, "reference contact")
     if not rc:
-        console.print(f"[red]Reference contact {ref_id} not found[/red]")
         return
 
     # Avoid duplicates
@@ -107,6 +112,5 @@ def ref_use(app_id: str, ref_id: str, notes: str) -> None:
     )
     store.save_application(application)
 
-    people = {p.id: p for p in store.all_people()}
     p = people.get(rc.person_id)
     console.print(f"[green]Reference added[/green] {p.name if p else rc.id}")
