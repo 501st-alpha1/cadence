@@ -11,14 +11,12 @@ from rich.rule import Rule
 
 from cadence.config import load_config
 from cadence.storage import Store
+from cadence.models.application import TERMINAL_STATUSES
 from cadence.utils.cli import short_id
 
 console = Console()
 
-_TERMINAL_STATUSES = {
-    "withdrawn", "rejected", "ghosted",
-    "declined_offer", "position_filled", "accepted",
-}
+_TERMINAL_STATUSES = TERMINAL_STATUSES
 
 
 def _parse_dt(s: Optional[str]) -> Optional[datetime]:

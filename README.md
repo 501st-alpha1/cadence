@@ -65,12 +65,14 @@ cadence app add [--company] [--jd] [--role] [--source] [--resume] [--status]
 cadence app show <id>
 cadence app list [--status] [--company] [--active]
 cadence app status <id> <new-status>
+cadence app submit <id> [--notes]    # started → applied
+cadence app cancel <id> [--notes]    # started → canceled (abandoned before submitting)
 cadence app note <id>        # opens $EDITOR
 cadence app cover <id>       # compose/edit cover letter in $EDITOR
 ```
 
-Valid statuses: `saved` `applied` `phone_screen` `interview` `offer`
-`accepted` `withdrawn` `rejected` `ghosted` `declined_offer` `position_filled` `paused`
+Valid statuses: `saved` `started` `applied` `phone_screen` `interview` `offer`
+`accepted` `withdrawn` `rejected` `ghosted` `declined_offer` `position_filled` `paused` `canceled`
 
 ### People (private)
 ```sh

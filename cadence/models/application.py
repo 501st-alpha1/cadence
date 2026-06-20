@@ -9,6 +9,7 @@ from cadence.models.base import BaseModel, new_id, now_utc
 
 class ApplicationStatus(str, Enum):
     SAVED = "saved"
+    STARTED = "started"
     APPLIED = "applied"
     PHONE_SCREEN = "phone_screen"
     INTERVIEW = "interview"
@@ -20,6 +21,20 @@ class ApplicationStatus(str, Enum):
     DECLINED_OFFER = "declined_offer"
     POSITION_FILLED = "position_filled"
     PAUSED = "paused"
+    CANCELED = "canceled"
+
+
+# Statuses after which an application is no longer "in flight" — excluded
+# from follow-up suggestions and from bulk-withdraw prompts on offer accept.
+TERMINAL_STATUSES = {
+    ApplicationStatus.WITHDRAWN.value,
+    ApplicationStatus.REJECTED.value,
+    ApplicationStatus.GHOSTED.value,
+    ApplicationStatus.DECLINED_OFFER.value,
+    ApplicationStatus.POSITION_FILLED.value,
+    ApplicationStatus.ACCEPTED.value,
+    ApplicationStatus.CANCELED.value,
+}
 
 
 @dataclass

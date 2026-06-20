@@ -6,6 +6,7 @@ from rich.console import Console
 from cadence.config import load_config
 from cadence.models import Offer
 from cadence.models.offer import OfferVersion, OfferStatus
+from cadence.models.application import TERMINAL_STATUSES
 from cadence.models.base import now_utc
 from cadence.storage import Store
 from cadence.utils.cli import short_id, print_kv
@@ -108,11 +109,9 @@ def offer_accept(app_id: str) -> None:
         store.save_application(application)
 
     # Offer to withdraw other active applications
-    terminal = {"withdrawn", "rejected", "ghosted",
-                "declined_offer", "position_filled", "accepted"}
     others = [
         a for a in store.all_applications()
-        if a.id != app_id and a.status not in terminal
+        if a.id != app_id and a.status not in TERMINAL_STATUSES
     ]
     if others:
         console.print(

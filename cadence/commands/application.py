@@ -8,6 +8,7 @@ from rich.table import Table
 
 from cadence.config import load_config
 from cadence.models import Application, ApplicationStatus
+from cadence.models.application import TERMINAL_STATUSES
 from cadence.storage import Store
 from cadence.utils.cli import resolve_or_pick, open_in_editor, short_id, print_kv
 
@@ -30,7 +31,7 @@ def app() -> None:
 @click.option("--source", default=None,
               help="e.g. linkedin, referral, hacker_news")
 @click.option("--resume", default=None, help="Resume version label")
-@click.option("--status", default="applied",
+@click.option("--status", default="started",
               type=click.Choice(VALID_STATUSES), show_default=True)
 def app_add(company_query, jd_id, role, source, resume, status) -> None:
     """Add a new application."""
@@ -145,13 +146,10 @@ def app_list(status, company_query, active) -> None:
     companies = {c.id: c for c in store.all_companies()}
     jds = {j.id: j for j in store.all_job_descriptions()}
 
-    terminal = {"withdrawn", "rejected", "ghosted",
-                "declined_offer", "position_filled", "accepted"}
-
     applications = list(store.all_applications())
 
     if active:
-        applications = [a for a in applications if a.status not in terminal]
+        applications = [a for a in applications if a.status not in TERMINAL_STATUSES]
     if status:
         applications = [a for a in applications if a.status == status]
     if company_query:
@@ -201,6 +199,37 @@ def app_status(app_id: str, new_status: str, notes: str) -> None:
         application.applied_at = application.status_history[-1].at
     store.save_application(application)
     console.print(f"[green]Status updated[/green] → {new_status}")
+
+
+@app.command("submit")
+@click.argument("app_id")
+@click.option("--notes", default="")
+def app_submit(app_id: str, notes: str) -> None:
+    """Mark an application as submitted (started → applied)."""
+    store = Store(load_config())
+    application = store.get_application(app_id)
+    if not application:
+        console.print(f"[red]Application {app_id} not found[/red]")
+        return
+    application.transition("applied", notes=notes)
+    application.applied_at = application.status_history[-1].at
+    store.save_application(application)
+    console.print(f"[green]Submitted.[/green] Status → applied")
+
+
+@app.command("cancel")
+@click.argument("app_id")
+@click.option("--notes", default="", help="Why you're abandoning this application")
+def app_cancel(app_id: str, notes: str) -> None:
+    """Abandon an application before submitting it (started → canceled)."""
+    store = Store(load_config())
+    application = store.get_application(app_id)
+    if not application:
+        console.print(f"[red]Application {app_id} not found[/red]")
+        return
+    application.transition("canceled", notes=notes)
+    store.save_application(application)
+    console.print("[yellow]Application canceled.[/yellow]")
 
 
 @app.command("note")
